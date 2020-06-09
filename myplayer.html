@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+    <link rel="stylesheet" href="myplayer.css">
+</head>
+<body>
+    <div id="app-player" v-cloak>
+        <div class="player-box">
+            <div class="top">
+                <span class="title">潘多拉音乐盒</span>
+                <div class="search">
+                    <input type="text" class="search-item" v-model="keywords" v-on:keyup.enter="searchSong">
+                    <span class="search-icon"></span>
+                </div>
+            </div>
+            <div class="middle">
+                <!-- 歌曲列表开始 -->
+                <div class="content-left">
+                    <ul class="songlist">
+                        <li class="songlist-item" v-for="item,index in songs">
+                            <span class="play-now" @click="playNow(index)"></span>
+                            <span class="song-title">{{item.name}}</span>
+                            <span :class="['mv-show',{hidden:item.mvid == 0}]" @click="videoPlay(item.mvid)"></span>
+                            <!-- 视频按钮隐藏或者显示的类判断选择 -->
+                        </li>
+                    </ul>
+                </div>
+                <!-- 歌曲列表结束 -->
+                <!-- 歌曲详情开始 -->
+                <div class="content-center">
+                    <!-- <div class="song-detail"> -->
+                        <img :class="['player-bar',{playing:isAudioPlaying}]" src="images\player_bar.png" alt="">
+                        <div class="record">
+                            <img :class="{auto:isAudioPlaying}" src="images\disc.png" alt="">
+                            <!-- isAudioPlaying音频播放标记为真,动画class播放生效 -->
+                        </div>
+                        <img :src="picUrl" alt="" class="song-img">
+                    <!-- </div> -->
+                </div>
+                <!-- 歌曲详情结束 -->
+                <!-- 热门留言开始 -->
+                <div class="content-right">
+                    <h4 class="hotMes-title">热门留言</h4>
+                    <div class="hotMes-item" v-for="item,index in hotComments">
+                        <div class="hotMes-item-left">
+                            <img class="mes-icon" :src=item.user.avatarUrl>
+                        </div>
+                        <div class="hotMes-item-right">
+                            <span class="mes-name">{{item.user.nickname}}</span>
+                            <span class="mes-content">{{item.content}}</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+    <!-- 热门留言结束 -->
+            <!-- 视频播放开始 -->
+            <!-- <div :class="['hidden',{videoplay:isVideoPlaying}]"> -->
+                <!-- 这里不是增加类,而是切换类,所以用三目运算符 -->
+                <div :class="isVideoPlaying ? 'videoplay':'hidden'"> 
+                <div class="video-mask">
+                </div>
+                <video :src="videoUrl" class="video-show" ref="video" autoplay controls loop></video>
+                <span class="video-close" @click="videoClose">×</span>
+            </div>
+            <!-- 视频播放结束 -->
+            <!-- 音频播放进度条开始 -->
+            <div class="bottom">
+                <audio ref="audio" class="player-button" :src="songurl" controls autoplay loop></audio>
+                <!-- 请求拿到url后传给src必须绑定属性,才能监听src的变化 -->
+            </div>
+            <!-- 音频播放进度条结束 -->
+        </div>
+    </div>
+</body>
+<script src="node_modules/vue/dist/vue.js"></script>
+<script src="node_modules/axios/dist/axios.js"></script>
+<script src="js/common.js"></script>
+<script>
+    let vm = new Vue ({
+        el:"#app-player",
+        data:{
+            songs:[],
+            keywords:"热门",
+            search_item:[],
+            id:"",
+            songurl:"", //歌曲url
+            songImg:"", //歌曲图片url
+            hotComments:[],//评论用户头像
+            picUrl:"",
+            videoUrl:"",
+            isVideoPlaying:false,//是否出现视频播放遮罩
+            isAudioPlaying:false,//是否音频播放
+        },
+        mounted:function(id){
+            //初始化歌曲列表获取数据
+            Axios.get("/search",{
+                params:{
+                    keywords:this.keywords
+                }
+            }).then((res)=>{
+                console.log(res);
+                console.log(res.result.songs)
+                this.songs = res.result.songs
+                //箭头函数可以避免this的引用问题
+                //为什么封装函数
+                //1.url里面的域名头要频繁写上
+                //2.请求成功后获得一些额外却不需要的信息
+                Axios.get("/song/detail",{
+                    //初始化中间歌曲详情,默认是第一个
+                    params:{
+                    ids:this.songs[0].id
+                    }
+                }).then((res)=>{
+                    console.log(res)
+                    this.picUrl = res.songs[0].al.picUrl
+                })
+                Axios.get("/comment/hot?type=0",{
+                    params:{
+                    id:this.songs[0].id
+                    }
+                }).then((res)=>{
+                    console.log(res)
+                    this.hotComments = res.hotComments
+                })
+                           
+            })
+
+        },
+        methods: {
+            searchSong:function(){
+            //     let search_item = []
+            //     this.songs.forEach((v,i)=>{
+            //         if(v.name.indexOf(this.keywords) != -1){
+            //             search_item.push(v.name)
+            //         }
+            //     })
+            // // })
+            //     console.log(search_item)
+            //     //拿到空数组??
+            //     return search_item
+                Axios.get("/search",{
+                    params:{
+                        keywords:this.keywords
+                    }
+                }).then((res)=>{
+                    console.log(res);
+                    console.log(res.result.songs)
+                    this.songs = res.result.songs
+                })
+            },
+            playNow:function(index){
+                //歌曲url播放获取
+                Axios.get("/song/url",{
+                    params:{
+                        id:this.songs[index].id
+                    }
+                }).then((res)=>{
+                    console.log(res)
+                    this.songurl = res.data[0].url
+                    console.log(this.songurl)
+                    this.isAudioPlaying = true                       
+                })
+                //歌曲评论的获取
+                Axios.get("/comment/hot?type=0",{
+                    params:{
+                    id:this.songs[index].id
+                    }
+                }).then((res)=>{
+                    console.log(res)
+                    this.hotComments = res.hotComments
+                })
+                //歌曲详情获取
+                Axios.get("/song/detail",{
+                    params:{
+                    ids:this.songs[index].id
+                    }
+                }).then((res)=>{
+                    console.log(res)
+                    this.picUrl = res.songs[0].al.picUrl
+                })
+            },
+            //视频弹窗框播放
+            videoPlay:function(mvid){
+                this.isVideoPlaying = true
+                //视频播放的时候应该关掉音频
+                this.$refs.audio.pause();
+
+                Axios.get("/mv/url",{
+                    params:{
+                        id:mvid
+                    }
+                }).then((res)=>{
+                    console.log(res)
+                    this.videoUrl = res.data.url
+                })
+            },
+            //点击关闭按钮视频关闭
+            videoClose:function(){
+                // this.videoUrl = "";
+                // 直接就是没有了url,简单粗暴地关掉
+                this.$refs.video.pause();
+                this.isVideoPlaying = false;
+                //这里还有一个问题是:视频播放的时候,音频还在播,要做个关掉标记
+            }
+
+        },
+    })
+//     function getUserAccount() {
+//   return axios.get('/user/12345');
+// }
+
+// function getUserPermissions() {
+//   return axios.get('/user/12345/permissions');
+// }
+
+// axios.all([getUserAccount(), getUserPermissions()])
+//   .then(axios.spread(function (acct, perms) {
+//     // Both requests are now complete
+//   }));
+</script>
+</html> 
